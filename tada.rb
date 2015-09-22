@@ -7,6 +7,7 @@ require 'nokogiri'
 @config = YAML.load_file('config.yaml')
 
 class Map
+  # A class to represent a map to load.
   include Nokogiri
   include HTTParty
 
@@ -16,22 +17,30 @@ class Map
   end
 
   def full_path()
+    # Just the full path to the file.
     @path
   end
 
+  # TODO make this work for shape files.
   def tif_file()
+    # Return the name of the Tiff file.
     @path.split('/')[-1]
   end
 
+  # TODO make this work for shape files.
   def file_name()
+    # Return just the name of the the file without the extension.
     self.tif_file.gsub('.tif', '')
   end
 
+  # TODO this is just going to change a lot.
   def metadata_file()
+    # Return the path to the metadata file.
     @path.gsub('.tif', '.xml')
   end
 
   def metadata()
+    # Pull needed fields out of the metadata file
     data = Nokogiri::XML(File.read(self.metadata_file))
     {
       'title' => data.xpath("//field[@name='title']//value//text()"),
@@ -40,30 +49,37 @@ class Map
   end
 
   def ark()
+    # Try to figure out if there is already an ARK in the metadata file.
+    # If not, make one and add it to the metadata file.
     @data = Nokogiri::XML(File.open(self.metadata_file))
     ark_field =  @data.xpath("//field[@name='ark']//value").first
+    # Check to see if the ARK filed exists or is empty.
     if ark_field.nil? || ark_field.text == ''
 
       ark = create_ark()
 
+      # If there is no placeholder field, make the filed.
       if ark_field.nil?
         record = @data.xpath('//record//field')[-1]
         record.add_next_sibling("<field name='ark'><value>#{ark}</value></field>")
+      # If there is one, populate it.
       else
         ark_field.content = ark
       end
-
+      # Update the the metadata file.
       File.open(self.metadata_file, 'w') do |updated|
         updated << @data
       end
-
+      # And return the ARK.
       return ark
+    # Otherwise, just get the ARK from the metadata and return it.
     else
       ark_field.text
     end
   end
 
   def create_ark()
+    # Private method to create an ARK via the pidman REST API.
     pidman_auth = {
       username: @config['pidman_user'],
       password: @config['pidman_pass']
@@ -72,25 +88,30 @@ class Map
       'https://testpid.library.emory.edu/ark/', \
       body: "domain=#{@config['pidman_domain']}&target_uri=myuri.org&name=#{self.metadata['title']}", \
       basic_auth: pidman_auth
-
+    # The response will give us the full URL, we just want the PID.
     response.body.split('/')[-1]
   end
 
+  # Make the create_ark method private.
   private :create_ark
 
 end
 
 class GeoServer
+  # Class to provide access to the GeoServer.
   def initialize()
     @config = YAML.load_file('config.yaml')
   end
 
+  # TODO make this work for shape files.
   def endpoint()
+    # Return the proper endpoint to the GeoServer REST API.
     "#{@config['geoserver_url']}/geoserver/rest/workspaces/" \
     "#{@config['geoserver_workspace']}/coveragestores"
   end
 
   def auth()
+    # Return a hash for authenticaing to the REST API.
     auth = {
       username: @config['geoserver_user'],
       password: @config['geoserver_pass']
@@ -99,12 +120,14 @@ class GeoServer
   end
 end
 
-def add_store(map, ark)
+def add_store(map)
+  # Method to add the store to GeoServer.
   gs = GeoServer.new
+  # Generate the XML to set the attributes for the store.
   data = Nokogiri::XML::Builder.new do |xml|
     xml.coverageStore {
       xml.title map.metadata['title']
-      xml.name ark
+      xml.name map.ark
       xml.workspace @config['geoserver_workspace']
       xml.enabled 'true'
       xml.type 'GeoTIFF'
@@ -114,19 +137,23 @@ def add_store(map, ark)
     }
   end
 
+  # Post that to the REST API.
   response = HTTParty.post \
     gs.endpoint, \
     body: data.to_xml, \
     headers: { 'Content-type' => 'application/xml' },\
     basic_auth: gs.auth
 
+  # TODO add error handeling to the respons.
   puts response.code
 end
 
-def update_layer(map, ark)
+def update_layer(map)
+  # Metod to set attributes to a layer.
   data = Nokogiri::XML::Builder.new do |xml|
+    # Generate the XML for the post body.
     xml.coverage {
-      xml.name ark
+      xml.name map.ark
       xml.title map.metadata['title']
       xml.abstract map.metadata['description']
       xml.enabled 'true'
@@ -142,19 +169,22 @@ def update_layer(map, ark)
   gs = GeoServer.new
   url = "#{gs.endpoint}/#{ark}/coverages/#{map.file_name}.xml"
 
+  # PUT that data!
   response = HTTParty.put \
     url, \
     body: data.to_xml,
     headers: { 'Content-type' => 'application/xml' },\
     basic_auth: gs.auth
 
+  # TODO add some error handeling to the response code.
   puts response.code
 end
 
-def add_layer(map, ark)
+def add_layer(map)
+  # Method to take a store and make it avaliable as a layer.
   gs = GeoServer.new
   response = HTTParty.put \
-    "#{gs.endpoint}/#{ark}/external.geotiff?configure=first", \
+    "#{gs.endpoint}/#{map.ark}/external.geotiff?configure=first", \
     body: "file:data_dir/#{@config['geoserver_file_path']}/#{map.tif_file}", \
     headers: { 'Content-type' => 'text/plain' }, \
     basic_auth: gs.auth
@@ -163,12 +193,14 @@ def add_layer(map, ark)
 end
 
 def upload_tiff(map)
+  # Method to upload processed file to the GeoServer.
   Net::SFTP.start(@config['sftp_host'], @config['sftp_user'], password: @config['sftp_pass']) do |sftp|
     sftp.upload!("#{@config['out_dir']}#{map.tif_file}", "#{@config['sftp_path']}/#{map.tif_file}")
   end
 end
 
 def process_files(map)
+  # Method to prep GeoTIFFs for use in WMS applications.
   in_dir = @config['in_dir']
   tmp_dir = @config['tmp_dir']
   out_dir = @config['out_dir']
