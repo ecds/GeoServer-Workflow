@@ -91,6 +91,7 @@ class Map
       username: @config['pidman_user'],
       password: @config['pidman_pass']
     }
+    # TODO add error handeling if the POST fails
     response = HTTParty.post \
       'https://testpid.library.emory.edu/ark/', \
       body: "domain=#{@config['pidman_domain']}&target_uri=myuri.org&name=#{self.metadata['title']}", \
@@ -145,6 +146,7 @@ def add_store(map)
   end
 
   # Post that to the REST API.
+  # TODO add error handeling if the POST fails
   response = HTTParty.post \
     gs.endpoint, \
     body: data.to_xml, \
@@ -177,6 +179,7 @@ def update_layer(map)
   url = "#{gs.endpoint}/#{ark}/coverages/#{map.file_name}.xml"
 
   # PUT that data!
+  # TODO add error handeling if the POST fails
   response = HTTParty.put \
     url, \
     body: data.to_xml,
@@ -190,6 +193,7 @@ end
 def add_layer(map)
   # Method to take a store and make it avaliable as a layer.
   gs = GeoServer.new
+  # TODO add error handeling if the POST fails
   response = HTTParty.put \
     "#{gs.endpoint}/#{map.ark}/external.geotiff?configure=first", \
     body: "file:data_dir/#{@config['geoserver_file_path']}/#{map.tif_file}", \
