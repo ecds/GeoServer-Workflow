@@ -3,6 +3,8 @@ require 'yaml'
 require 'net/sftp'
 require 'httparty'
 require 'nokogiri'
+require 'optparse'
+require 'ostruct'
 
 @config = YAML.load_file('config.yaml')
 
@@ -11,8 +13,9 @@ class Map
   include Nokogiri
   include HTTParty
 
-  def initialize(path)
+  def initialize(path, metadata_file_path)
     @path = path
+    @metadata_file_path = metadata_file_path
     @config = YAML.load_file('config.yaml')
   end
 
@@ -36,7 +39,11 @@ class Map
   # TODO this is just going to change a lot.
   def metadata_file()
     # Return the path to the metadata file.
-    @path.gsub('.tif', '.xml')
+    if @metadata_file_path == nil
+      @path.gsub('.tif', '.xml')
+    else
+      @metadata_file_path
+    end
   end
 
   def metadata()
@@ -216,19 +223,72 @@ def process_files(map)
   addo = "gdaladdo -r average #{out_dir}#{map.tif_file} 2 4 8 16 32"
   system addo
 
+  # Clean up tmp files.
   FileUtils.rm("#{tmp_dir}#{map.tif_file}")
 
 end
 
-Dir[@config['in_dir']].each do |file|
-  map = Map.new(file)
-  #process_files(map)
-  # upload_tiff(map)
-  # ark = create_ark(map)
-  ark = map.ark
-  puts map.tif_file
-  puts ark
-  #add_store(map, ark)
-  #add_layer(map, ark)
-  #update_layer(map, ark)
+def run_all(map)
+  process_files(map)
+  upload_tiff(map)
+  add_store(map)
+  add_layer(map)
+  update_layer(map)
+end
+
+@options = OpenStruct.new
+OptionParser.new do |opt|
+  opt.on('--tif', '-t /path/to/map.tif', ' Path to tif file.') {
+    |o| @options.tif_file_path = o
+  }
+  opt.on('--mdfile', '-md /path/to/metadata.xml', 'Path to metadata file.') {
+    |o| @options.metadata_file_path = o
+  }
+  opt.on('--method', '-m METHOD', 'Run a single method.') {
+    |o| @options.method_to_run = o
+  }
+end.parse!
+
+def run_what(map)
+  if @options.method_to_run != nil
+    action = @options.method_to_run
+    if action == 'porcess'
+      porcess_files(map)
+    elsif action == 'upload'
+      upload_tiff(map)
+    elsif action == 'add_store'
+      add_store(map)
+    elsif action == 'add_layer'
+      add_layer(map)
+    elsif action == 'update_layer'
+      update_layer(map)
+    else
+      puts "Unkonw method."
+      exit
+    end
+  else
+    run_all(map)
+  end
+end
+
+if @options.tif_file_path
+  map = Map.new(@options.tif_file_path, @options.metadata_file_path)
+else
+  maps = []
+  Dir[@config['in_dir']].each do |file|
+    map = Map.new(file, nil)
+    maps.push(map)
+  end
+end
+
+if maps == nil
+  run_what(map)
+else
+  if @options.metadata_file_path != nil
+    puts "You can not specify a metadata file when processing multiple files."
+    exit
+  end
+  maps.each do |map|
+    run_what(map)
+  end
 end
