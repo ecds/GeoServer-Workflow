@@ -5,8 +5,10 @@ require 'httparty'
 require 'nokogiri'
 require 'optparse'
 require 'ostruct'
+require 'logger'
 
-@config = YAML.load_file('config.yaml')
+$logger = Logger.new('map_processing.log')
+$config = YAML.load_file('config.yaml')
 
 class Map
   # A class to represent a map to load.
@@ -16,7 +18,6 @@ class Map
   def initialize(path, metadata_file_path)
     @path = path
     @metadata_file_path = metadata_file_path
-    @config = YAML.load_file('config.yaml')
   end
 
   def full_path()
@@ -88,16 +89,20 @@ class Map
   def create_ark()
     # Private method to create an ARK via the pidman REST API.
     pidman_auth = {
-      username: @config['pidman_user'],
-      password: @config['pidman_pass']
+      username: $config['pidman_user'],
+      password: $config['pidman_pass']
     }
-    # TODO add error handeling if the POST fails
+
     response = HTTParty.post \
       'https://testpid.library.emory.edu/ark/', \
-      body: "domain=#{@config['pidman_domain']}&target_uri=myuri.org&name=#{self.metadata['title']}", \
+      body: "domain=#{$config['pidman_domain']}&target_uri=myuri.org&name=#{self.metadata['title']}", \
       basic_auth: pidman_auth
     # The response will give us the full URL, we just want the PID.
-    response.body.split('/')[-1]
+    if  "#{response.code}" == '201'
+      return response.body.split('/')[-1]
+    else
+      $logger.error "Failed to create ARK for #{self.file_name}. Response was #{response.code}"
+    end
   end
 
   # Make the create_ark method private.
@@ -108,21 +113,21 @@ end
 class GeoServer
   # Class to provide access to the GeoServer.
   def initialize()
-    @config = YAML.load_file('config.yaml')
+    $config = YAML.load_file('config.yaml')
   end
 
   # TODO make this work for shape files.
   def endpoint()
     # Return the proper endpoint to the GeoServer REST API.
-    "#{@config['geoserver_url']}/geoserver/rest/workspaces/" \
-    "#{@config['geoserver_workspace']}/coveragestores"
+    "#{$config['geoserver_url']}/geoserver/rest/workspaces/" \
+    "#{$config['geoserver_workspace']}/coveragestores"
   end
 
   def auth()
     # Return a hash for authenticaing to the REST API.
     auth = {
-      username: @config['geoserver_user'],
-      password: @config['geoserver_pass']
+      username: $config['geoserver_user'],
+      password: $config['geoserver_pass']
     }
     return auth
   end
@@ -136,7 +141,7 @@ def add_store(map)
     xml.coverageStore {
       xml.title map.metadata['title']
       xml.name map.ark
-      xml.workspace @config['geoserver_workspace']
+      xml.workspace $config['geoserver_workspace']
       xml.enabled 'true'
       xml.type 'GeoTIFF'
       xml.url "file:ATLMaps/ATL28_Sheets/#{map.tif_file}"
@@ -146,15 +151,16 @@ def add_store(map)
   end
 
   # Post that to the REST API.
-  # TODO add error handeling if the POST fails
   response = HTTParty.post \
     gs.endpoint, \
     body: data.to_xml, \
     headers: { 'Content-type' => 'application/xml' },\
     basic_auth: gs.auth
 
-  # TODO add error handeling to the respons.
-  puts response.code
+  # Log an error if store was not created.
+  if  "#{response.code}" != '201'
+    $logger.error "Failed to add store for #{map.file_name}. Response was #{response.code}"
+  end
 end
 
 def update_layer(map)
@@ -176,45 +182,49 @@ def update_layer(map)
     }
   end
   gs = GeoServer.new
-  url = "#{gs.endpoint}/#{ark}/coverages/#{map.file_name}.xml"
+  url = "#{gs.endpoint}/#{map.ark}/coverages/#{map.file_name}.xml"
 
   # PUT that data!
-  # TODO add error handeling if the POST fails
   response = HTTParty.put \
     url, \
     body: data.to_xml,
     headers: { 'Content-type' => 'application/xml' },\
     basic_auth: gs.auth
 
-  # TODO add some error handeling to the response code.
-  puts response.code
+    # Log an error if store was not created.
+    if  "#{response.code}" != '200'
+      $logger.error "Failed to update layer for #{map.file_name}. Response was #{response.code}"
+    end
 end
 
 def add_layer(map)
   # Method to take a store and make it avaliable as a layer.
   gs = GeoServer.new
-  # TODO add error handeling if the POST fails
+
   response = HTTParty.put \
     "#{gs.endpoint}/#{map.ark}/external.geotiff?configure=first", \
-    body: "file:data_dir/#{@config['geoserver_file_path']}/#{map.tif_file}", \
+    body: "file:data_dir/#{$config['geoserver_file_path']}/#{map.tif_file}", \
     headers: { 'Content-type' => 'text/plain' }, \
     basic_auth: gs.auth
 
-  puts response.code
+    # Log an error if store was not created.
+    if  "#{response.code}" != '201'
+      $logger.error "Failed to add layer for #{map.file_name}. Response was #{response.code}"
+    end
 end
 
 def upload_tiff(map)
   # Method to upload processed file to the GeoServer.
-  Net::SFTP.start(@config['sftp_host'], @config['sftp_user'], password: @config['sftp_pass']) do |sftp|
-    sftp.upload!("#{@config['out_dir']}#{map.tif_file}", "#{@config['sftp_path']}/#{map.tif_file}")
+  Net::SFTP.start($config['sftp_host'], $config['sftp_user'], password: $config['sftp_pass']) do |sftp|
+    sftp.upload!("#{$config['out_dir']}#{map.tif_file}", "#{$config['sftp_path']}/#{map.tif_file}")
   end
 end
 
 def process_files(map)
   # Method to prep GeoTIFFs for use in WMS applications.
-  in_dir = @config['in_dir']
-  tmp_dir = @config['tmp_dir']
-  out_dir = @config['out_dir']
+  in_dir = $config['in_dir']
+  tmp_dir = $config['tmp_dir']
+  out_dir = $config['out_dir']
 
   warp = "gdalwarp -s_srs EPSG:2240 -t_srs EPSG:4326 -r average\
     #{map.full_path} #{tmp_dir}#{map.tif_file}"
@@ -234,7 +244,7 @@ end
 
 def run_all(map)
   process_files(map)
-  upload_tiff(map)
+  # upload_tiff(map)
   add_store(map)
   add_layer(map)
   update_layer(map)
@@ -279,7 +289,7 @@ if @options.tif_file_path
   map = Map.new(@options.tif_file_path, @options.metadata_file_path)
 else
   maps = []
-  Dir[@config['in_dir']].each do |file|
+  Dir[$config['in_dir']].each do |file|
     map = Map.new(file, nil)
     maps.push(map)
   end

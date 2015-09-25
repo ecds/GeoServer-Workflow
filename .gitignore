@@ -1,3 +1,4 @@
 geotiffs
 .DS_Store
 config.yaml
+map_processing.log
