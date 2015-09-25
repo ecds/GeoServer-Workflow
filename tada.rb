@@ -40,6 +40,7 @@ class Map
   # TODO this is just going to change a lot.
   def metadata_file()
     # Return the path to the metadata file.
+    # TODO, make sure file exists.
     if @metadata_file_path == nil
       @path.gsub('.tif', '.xml')
     else
@@ -49,40 +50,47 @@ class Map
 
   def metadata()
     # Pull needed fields out of the metadata file
-    data = Nokogiri::XML(File.read(self.metadata_file))
-    {
-      'title' => data.xpath("//field[@name='title']//value//text()"),
-      'description' => data.xpath("//field[@name='description']//value//text()")
-    }
+    begin
+      data = Nokogiri::XML(File.read(self.metadata_file))
+      {
+        'title' => data.xpath("//field[@name='title']//value//text()"),
+        'description' => data.xpath("//field[@name='description']//value//text()")
+      }
+    rescue
+      $logger.error "Fool, no metadata for #{self.tif_file}"
+      return nil
+    end
   end
 
   def ark()
-    # Try to figure out if there is already an ARK in the metadata file.
-    # If not, make one and add it to the metadata file.
-    @data = Nokogiri::XML(File.open(self.metadata_file))
-    ark_field =  @data.xpath("//field[@name='ark']//value").first
-    # Check to see if the ARK filed exists or is empty.
-    if ark_field.nil? || ark_field.text == ''
+    if self.metadata != nil
+      # Try to figure out if there is already an ARK in the metadata file.
+      # If not, make one and add it to the metadata file.
+      @data = Nokogiri::XML(File.open(self.metadata_file))
+      ark_field =  @data.xpath("//field[@name='ark']//value").first
+      # Check to see if the ARK filed exists or is empty.
+      if ark_field.nil? || ark_field.text == ''
 
-      ark = create_ark()
+        ark = create_ark()
 
-      # If there is no placeholder field, make the filed.
-      if ark_field.nil?
-        record = @data.xpath('//record//field')[-1]
-        record.add_next_sibling("<field name='ark'><value>#{ark}</value></field>")
-      # If there is one, populate it.
+        # If there is no placeholder field, make the filed.
+        if ark_field.nil?
+          record = @data.xpath('//record//field')[-1]
+          record.add_next_sibling("<field name='ark'><value>#{ark}</value></field>")
+        # If there is one, populate it.
+        else
+          ark_field.content = ark
+        end
+        # Update the the metadata file.
+        File.open(self.metadata_file, 'w') do |updated|
+          updated << @data
+        end
+        # And return the ARK.
+        return ark
+      # Otherwise, just get the ARK from the metadata and return it.
       else
-        ark_field.content = ark
+        ark_field.text
       end
-      # Update the the metadata file.
-      File.open(self.metadata_file, 'w') do |updated|
-        updated << @data
-      end
-      # And return the ARK.
-      return ark
-    # Otherwise, just get the ARK from the metadata and return it.
-    else
-      ark_field.text
     end
   end
 
@@ -160,6 +168,7 @@ def add_store(map)
   # Log an error if store was not created.
   if  "#{response.code}" != '201'
     $logger.error "Failed to add store for #{map.file_name}. Response was #{response.code}"
+    $logger.error "Error adding store #{map.file_name}: #{response.body}"
   end
 end
 
@@ -194,6 +203,7 @@ def update_layer(map)
     # Log an error if store was not created.
     if  "#{response.code}" != '200'
       $logger.error "Failed to update layer for #{map.file_name}. Response was #{response.code}"
+      $logger.error "Error updateing layer for #{map.file_name}: #{response.body}"
     end
 end
 
@@ -210,6 +220,7 @@ def add_layer(map)
     # Log an error if store was not created.
     if  "#{response.code}" != '201'
       $logger.error "Failed to add layer for #{map.file_name}. Response was #{response.code}"
+      $logger.error "Error adding layer #{map.file_name}: #{response.body}"
     end
 end
 
@@ -243,11 +254,15 @@ def process_files(map)
 end
 
 def run_all(map)
-  process_files(map)
-  # upload_tiff(map)
-  add_store(map)
-  add_layer(map)
-  update_layer(map)
+  if map.metadata != nil
+    process_files(map)
+    # upload_tiff(map)
+    add_store(map)
+    add_layer(map)
+    update_layer(map)
+  else
+    $logger.error "Could not process #{map.tif_file}. No metadata file found."
+  end
 end
 
 @options = OpenStruct.new
@@ -255,7 +270,7 @@ OptionParser.new do |opt|
   opt.on('--tif', '-t /path/to/map.tif', ' Path to tif file.') {
     |o| @options.tif_file_path = o
   }
-  opt.on('--mdfile', '-md /path/to/metadata.xml', 'Path to metadata file.') {
+  opt.on('--mdfile', '-d /path/to/metadata.xml', 'Path to metadata file.') {
     |o| @options.metadata_file_path = o
   }
   opt.on('--method', '-m METHOD', 'Run a single method.') {
