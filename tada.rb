@@ -281,8 +281,8 @@ end.parse!
 def run_what(map)
   if @options.method_to_run != nil
     action = @options.method_to_run
-    if action == 'porcess'
-      porcess_files(map)
+    if action == 'process'
+      process_files(map)
     elsif action == 'upload'
       upload_tiff(map)
     elsif action == 'add_store'
