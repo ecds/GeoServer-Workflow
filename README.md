@@ -6,11 +6,11 @@ This script is specific to Emory University's workflow and infrastructure, but c
 ## Dependencies
 You will need ruby and a few gems:
 
-<code>gem install install net-sftp</code>
+<code>gem install net-sftp</code>
 
-<code>gem install install httparty</code>
+<code>gem install httparty</code>
 
-<code>gem install install nokogiri</code>
+<code>gem install nokogiri</code>
 
 ## config.yaml
 Provided is a sample config file (<code>config.yaml.dst</code>). Rename that to <code>config.yaml</code> and fill in the various items.
