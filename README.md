@@ -3,6 +3,8 @@ This script automates the process for preparing GeoTIFFs for use in WMS applicat
 
 This script is specific to Emory University's workflow and infrastructure, but could be adapted. Please feel free to open an issue here or contact <libsysdev-l@listserv.cc.emory.edu> if you have questions.
 
+Special thanks to Eric Willoughby at Georgia State University for working out the GDAL commands and consulting on GeoServer REST calls.
+
 ## Dependencies
 You will need ruby and a few gems:
 
