@@ -1,5 +1,5 @@
 # GeoServer Workflow
-This script automates the process for preparing GeoTIFFs for us in WMS applications and adding them to GeoServer.
+This script automates the process for preparing GeoTIFFs for use in WMS applications and adding them to GeoServer.
 
 This script is specific to Emory University's workflow and infrastructure, but could be adapted. Please feel free to open an issue here or contact <libsysdev-l@listserv.cc.emory.edu> if you have questions.
 
@@ -12,8 +12,8 @@ You will need ruby and a few gems:
 
 <code>gem install install nokogiri</code>
 
-## confi.yaml
-Provided is a sample cofing file (<code>cofig.yaml.dst</code>). Rename that to <code>config.yaml</code> and fill in the various items.
+## config.yaml
+Provided is a sample config file (<code>config.yaml.dst</code>). Rename that to <code>config.yaml</code> and fill in the various items.
 
 ## What the script does
 * Collects all the tiff files in the configured directory
@@ -22,25 +22,25 @@ Provided is a sample cofing file (<code>cofig.yaml.dst</code>). Rename that to <
 	* Finds the proper metadata file based on configured directory and matching file name. For example, if the script finds Sheet4.tif, it will look for Sheet4.xml
 	* Checks the metadata file for an ARK. If no ARK is found, it creates one and adds it to the metadata file
 	* Uploads the GeoTIFF to the configured remote directory
-	* Adds a store in GeoSever for the GeoTIFF using the ARK as the name and the title from the metadata file for the title
+	* Adds a store in GeoServer for the GeoTIFF using the ARK as the name and the title from the metadata file for the title
 	* Adds a layer in GeoServer for the new store
-	* Updates the fields in GeoSever based on the metadata
+	* Updates the fields in GeoServer based on the metadata
 
 ## Usage
-If you do not pass any options to the script, it will run though the process described above. You can pass it a specific path to a GeoTIFF. You can also pass it a specific path for a metadata file. If you do not provide a metadata file, the script will try to find it based on the file's name. Note: you can only specify a metadata file when specifying a GeoTIFF.
+If you do not pass any options to the script, it will run though the process described above. You can pass it a specific path to a GeoTIFF. You can also pass it a specific path for a metadata file. If you do not provide a metadata file, the script will try to find it based on the file's name. Note: You can only specify a metadata file when specifying a GeoTIFF.
 
 You can also run a single part of the script:
 
 	ruby tada [options]
 		-t, --tif /path/to/map.tif         Path to tif file.
     	-d, --mdfile /path/to/metadata.xml Path to metadata file.
-       -m, --method METHOD                Run a single method.
+      	-m, --method METHOD                Run a single method.
        Methods:
-       	process # Runs the GeoTiff though GDAL process.
-       	upload # Uploads GeoTiff to GeoServer
-       	add_store # Adds a store in GeoServer for the GeoTiff
-       	add_layer # Creates a layer from GeoTiff's store in GeoServer
+       	process # Runs the GeoTIFF thorugh GDAL process
+       	upload # Uploads GeoTIFF to GeoServer
+       	add_store # Adds a store in GeoServer for the GeoTIFF
+       	add_layer # Creates a layer from GeoTIFF's store in GeoServer
        	update_layer # Updates the layer's metadata in GeoServer
 
 ## License
-This GeoServer-Workflow is distributed und the [Apache 2.0 License](http://www.apache.org/licenses/LICENSE-2.0). Enjoy.
+This GeoServer-Workflow is distributed under the [Apache 2.0 License](http://www.apache.org/licenses/LICENSE-2.0). Enjoy.
