@@ -144,6 +144,7 @@ class GeoServer
   end
 
   def store_metadata(map)
+    # Method to construct the body XML for adding the store.
     Nokogiri::XML::Builder.new do |xml|
       xml.coverageStore {
         xml.title map.metadata['title']
@@ -159,9 +160,9 @@ class GeoServer
   end
 
   def layer_metadata(map)
+    # Method to construct the body XML for updating the layer info.
     Nokogiri::XML::Builder.new do |xml|
-      # Generate the XML for the post body.
-      xml.coverage {
+        xml.coverage {
         xml.name map.ark
         xml.title map.metadata['title']
         xml.abstract map.metadata['description']
@@ -178,7 +179,7 @@ class GeoServer
   end
 
   def add_store(map)
-    # Post that to the REST API.
+    # Method to create new store in GeoServer
     response = HTTParty.post \
       self.endpoint, \
       body: self.store_metadata(map).to_xml, \
@@ -189,12 +190,12 @@ class GeoServer
       if  "#{response.code}" != '201'
         $logger.error "Failed to add store for #{map.file_name}. Response was #{response.code}"
         $logger.error "Error adding store #{map.file_name}: #{response.body}"
+        puts "There was an error adding store for #{map.file_name}. Please see log for more details."
       end
   end
 
   def add_layer(map)
     # Method to take a store and make it avaliable as a layer.
-
     response = HTTParty.put \
       "#{self.endpoint}/#{map.ark}/external.geotiff?configure=first", \
       body: "file:data_dir/#{$config['geoserver_file_path']}/#{map.tif_file}", \
@@ -205,6 +206,7 @@ class GeoServer
       if  "#{response.code}" != '201'
         $logger.error "Failed to add layer for #{map.file_name}. Response was #{response.code}"
         $logger.error "Error adding layer #{map.file_name}: #{response.body}"
+        puts "There was an error adding layer for #{map.file_name}. Please see log for more details."
       end
   end
 
@@ -223,13 +225,14 @@ class GeoServer
       if  "#{response.code}" != '200'
         $logger.error "Failed to update layer for #{map.file_name}. Response was #{response.code}"
         $logger.error "Error updateing layer for #{map.file_name}: #{response.body}"
+        puts "There was an error updating layer info for #{map.file_name}. Please see log for more details."
       end
   end
 
 end
 
 def add_to_geoserver(map)
-  # Method to add the store to GeoServer.
+  # Method to add the store and corresponding layer to GeoServer.
   puts "Adding #{map.tif_file} to GeoServer as #{map.ark}."
   gs = GeoServer.new
   gs.add_store(map)
@@ -264,6 +267,7 @@ def check_exit_status(status, command)
     puts "Failed running:"
     puts command
     puts "Be sure you have GDAL installed on your system: See https://trac.osgeo.org/gdal/wiki/DownloadingGdalBinaries"
+    exit
   end
 end
 
