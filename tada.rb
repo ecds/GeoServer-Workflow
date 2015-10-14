@@ -226,8 +226,23 @@ end
 
 def upload_tiff(map)
   # Method to upload processed file to the GeoServer.
+  # I snagged the progress monitor from here:
+  # http://net-ssh.github.io/sftp/v2/api/classes/Net/SFTP/Operations/Upload.html
   Net::SFTP.start($config['sftp_host'], $config['sftp_user'], password: $config['sftp_pass']) do |sftp|
-    sftp.upload!("#{$config['out_dir']}#{map.tif_file}", "#{$config['sftp_path']}/#{map.tif_file}")
+    sftp.upload!("#{$config['out_dir']}#{map.tif_file}", "#{$config['sftp_path']}/#{map.tif_file}") do |event, uploader, *args|
+      case event
+        when :open then
+          puts "starting upload: #{map.tif_file}"
+        when :put then
+          percent = args[1].to_f / args[0].size.to_f * 100
+          print "Uploading #{map.tif_file}: #{percent.to_i}% \r"
+          $stdout.flush
+        when :close then
+          puts "Finished uploading #{map.tif_file}"
+        when :finish then
+          puts "Upload done!"
+      end
+    end
   end
 end
 
@@ -314,7 +329,7 @@ if maps == nil
   run_what(map)
 else
   if @options.metadata_file_path != nil
-    puts "You can not specify a metadata file when processing multiple files."
+    puts "You cannot specify a metadata file when processing multiple files."
     exit
   end
   maps.each do |map|
