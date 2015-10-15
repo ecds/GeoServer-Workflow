@@ -6,7 +6,9 @@ This script is specific to Emory University's workflow and infrastructure, but c
 Special thanks to Eric Willoughby at Georgia State University for working out the GDAL commands and consulting on GeoServer REST calls.
 
 ## Dependencies
+Install the [GDAL](http://www.gdal.org/) tools for your OS: [https://trac.osgeo.org/gdal/wiki/DownloadingGdalBinaries](https://trac.osgeo.org/gdal/wiki/DownloadingGdalBinaries)
 You will need ruby and a few gems:
+> If you are using OS X you will need to install [XCode](https://developer.apple.com/xcode/) and the [XCode Command Line Tools](http://osxdaily.com/2014/02/12/install-command-line-tools-mac-os-x/) before trying to install the gems.
 
 <code>gem install net-sftp</code>
 

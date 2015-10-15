@@ -120,6 +120,9 @@ end
 
 class GeoServer
   # Class to provide access to the GeoServer.
+  include Nokogiri
+  include HTTParty
+
   def initialize()
     $config = YAML.load_file('config.yaml')
   end
@@ -139,95 +142,132 @@ class GeoServer
     }
     return auth
   end
-end
 
-def add_store(map)
-  # Method to add the store to GeoServer.
-  gs = GeoServer.new
-  # Generate the XML to set the attributes for the store.
-  data = Nokogiri::XML::Builder.new do |xml|
-    xml.coverageStore {
-      xml.title map.metadata['title']
-      xml.name map.ark
-      xml.workspace $config['geoserver_workspace']
-      xml.enabled 'true'
-      xml.type 'GeoTIFF'
-      xml.url "file:ATLMaps/ATL28_Sheets/#{map.tif_file}"
-      xml.description map.metadata['description']
-      xml.advertised 'true'
-    }
+  def store_metadata(map)
+    # Method to construct the body XML for adding the store.
+    Nokogiri::XML::Builder.new do |xml|
+      xml.coverageStore {
+        xml.title map.metadata['title']
+        xml.name map.ark
+        xml.workspace $config['geoserver_workspace']
+        xml.enabled 'true'
+        xml.type 'GeoTIFF'
+        xml.url "file:ATLMaps/ATL28_Sheets/#{map.tif_file}"
+        xml.description map.metadata['description']
+        xml.advertised 'true'
+      }
+    end
   end
 
-  # Post that to the REST API.
-  response = HTTParty.post \
-    gs.endpoint, \
-    body: data.to_xml, \
-    headers: { 'Content-type' => 'application/xml' },\
-    basic_auth: gs.auth
-
-  # Log an error if store was not created.
-  if  "#{response.code}" != '201'
-    $logger.error "Failed to add store for #{map.file_name}. Response was #{response.code}"
-    $logger.error "Error adding store #{map.file_name}: #{response.body}"
-  end
-end
-
-def update_layer(map)
-  # Metod to set attributes to a layer.
-  data = Nokogiri::XML::Builder.new do |xml|
-    # Generate the XML for the post body.
-    xml.coverage {
-      xml.name map.ark
-      xml.title map.metadata['title']
-      xml.abstract map.metadata['description']
-      xml.enabled 'true'
-      xml.metadataLinks {
-        xml.metadataLink {
-          xml.type 'text/plain'
-          xml.metadataType 'ISO19115:2003'
-          xml.content "http://digitalscholarship.emory.edu/mslemons/1928AtlantaAtlas/#{map.file_name}.xml"
+  def layer_metadata(map)
+    # Method to construct the body XML for updating the layer info.
+    Nokogiri::XML::Builder.new do |xml|
+        xml.coverage {
+        xml.name map.ark
+        xml.title map.metadata['title']
+        xml.abstract map.metadata['description']
+        xml.enabled 'true'
+        xml.metadataLinks {
+          xml.metadataLink {
+            xml.type 'text/plain'
+            xml.metadataType 'ISO19115:2003'
+            xml.content "http://digitalscholarship.emory.edu/mslemons/1928AtlantaAtlas/#{map.file_name}.xml"
+          }
         }
       }
-    }
-  end
-  gs = GeoServer.new
-  url = "#{gs.endpoint}/#{map.ark}/coverages/#{map.file_name}.xml"
-
-  # PUT that data!
-  response = HTTParty.put \
-    url, \
-    body: data.to_xml,
-    headers: { 'Content-type' => 'application/xml' },\
-    basic_auth: gs.auth
-
-    # Log an error if store was not created.
-    if  "#{response.code}" != '200'
-      $logger.error "Failed to update layer for #{map.file_name}. Response was #{response.code}"
-      $logger.error "Error updateing layer for #{map.file_name}: #{response.body}"
     end
+  end
+
+  def add_store(map)
+    # Method to create new store in GeoServer
+    response = HTTParty.post \
+      self.endpoint, \
+      body: self.store_metadata(map).to_xml, \
+      headers: { 'Content-type' => 'application/xml' },\
+      basic_auth: self.auth
+
+      # Log an error if store was not created.
+      if  "#{response.code}" != '201'
+        $logger.error "Failed to add store for #{map.file_name}. Response was #{response.code}"
+        $logger.error "Error adding store #{map.file_name}: #{response.body}"
+        puts "There was an error adding store for #{map.file_name}. Please see log for more details."
+      end
+  end
+
+  def add_layer(map)
+    # Method to take a store and make it avaliable as a layer.
+    response = HTTParty.put \
+      "#{self.endpoint}/#{map.ark}/external.geotiff?configure=first", \
+      body: "file:data_dir/#{$config['geoserver_file_path']}/#{map.tif_file}", \
+      headers: { 'Content-type' => 'text/plain' }, \
+      basic_auth: self.auth
+
+      # Log an error if store was not created.
+      if  "#{response.code}" != '201'
+        $logger.error "Failed to add layer for #{map.file_name}. Response was #{response.code}"
+        $logger.error "Error adding layer #{map.file_name}: #{response.body}"
+        puts "There was an error adding layer for #{map.file_name}. Please see log for more details."
+      end
+  end
+
+  def update_layer(map)
+    # Metod to set attributes to a layer.
+    url = "#{self.endpoint}/#{map.ark}/coverages/#{map.file_name}.xml"
+
+    # PUT that data!
+    response = HTTParty.put \
+      url, \
+      body: self.layer_metadata(map).to_xml,
+      headers: { 'Content-type' => 'application/xml' },\
+      basic_auth: self.auth
+
+      # Log an error if store was not created.
+      if  "#{response.code}" != '200'
+        $logger.error "Failed to update layer for #{map.file_name}. Response was #{response.code}"
+        $logger.error "Error updateing layer for #{map.file_name}: #{response.body}"
+        puts "There was an error updating layer info for #{map.file_name}. Please see log for more details."
+      end
+  end
+
 end
 
-def add_layer(map)
-  # Method to take a store and make it avaliable as a layer.
+def add_to_geoserver(map)
+  # Method to add the store and corresponding layer to GeoServer.
+  puts "Adding #{map.tif_file} to GeoServer as #{map.ark}."
   gs = GeoServer.new
-
-  response = HTTParty.put \
-    "#{gs.endpoint}/#{map.ark}/external.geotiff?configure=first", \
-    body: "file:data_dir/#{$config['geoserver_file_path']}/#{map.tif_file}", \
-    headers: { 'Content-type' => 'text/plain' }, \
-    basic_auth: gs.auth
-
-    # Log an error if store was not created.
-    if  "#{response.code}" != '201'
-      $logger.error "Failed to add layer for #{map.file_name}. Response was #{response.code}"
-      $logger.error "Error adding layer #{map.file_name}: #{response.body}"
-    end
+  gs.add_store(map)
+  gs.add_layer(map)
+  gs.update_layer(map)
 end
 
 def upload_tiff(map)
   # Method to upload processed file to the GeoServer.
+  # I snagged the progress monitor from here:
+  # http://net-ssh.github.io/sftp/v2/api/classes/Net/SFTP/Operations/Upload.html
   Net::SFTP.start($config['sftp_host'], $config['sftp_user'], password: $config['sftp_pass']) do |sftp|
-    sftp.upload!("#{$config['out_dir']}#{map.tif_file}", "#{$config['sftp_path']}/#{map.tif_file}")
+    sftp.upload!("#{$config['out_dir']}#{map.tif_file}", "#{$config['sftp_path']}/#{map.tif_file}") do |event, uploader, *args|
+      case event
+        when :open then
+          puts "Starting upload of: #{map.tif_file}"
+        when :put then
+          percent = args[1].to_f / args[0].size.to_f * 100
+          print "Uploading #{map.tif_file}: #{percent.to_i}% \r"
+          $stdout.flush
+        when :close then
+          puts "Finished uploading #{map.tif_file}"
+        when :finish then
+          puts "Upload done!"
+      end
+    end
+  end
+end
+
+def check_exit_status(status, command)
+  if status != 0
+    puts "Failed running:"
+    puts command
+    puts "Be sure you have GDAL installed on your system: See https://trac.osgeo.org/gdal/wiki/DownloadingGdalBinaries"
+    exit
   end
 end
 
@@ -240,13 +280,16 @@ def process_files(map)
   warp = "gdalwarp -s_srs EPSG:2240 -t_srs EPSG:4326 -r average\
     #{map.full_path} #{tmp_dir}#{map.tif_file}"
   system warp
+  check_exit_status($?.exitstatus, warp)
 
   translate = "gdal_translate -co 'TILED=YES' -co 'BLOCKXSIZE=256' -co\
     'BLOCKYSIZE=256' #{tmp_dir}#{map.tif_file} #{out_dir}#{map.tif_file}"
   system translate
+  check_exit_status($?.exitstatus, translate)
 
   addo = "gdaladdo -r average #{out_dir}#{map.tif_file} 2 4 8 16 32"
   system addo
+  check_exit_status($?.exitstatus, addo)
 
   # Clean up tmp files.
   FileUtils.rm("#{tmp_dir}#{map.tif_file}")
@@ -256,10 +299,8 @@ end
 def run_all(map)
   if map.metadata != nil
     process_files(map)
-    # upload_tiff(map)
-    add_store(map)
-    add_layer(map)
-    update_layer(map)
+    upload_tiff(map)
+    add_to_geoserver(map)
   else
     $logger.error "Could not process #{map.tif_file}. No metadata file found."
   end
@@ -285,12 +326,8 @@ def run_what(map)
       process_files(map)
     elsif action == 'upload'
       upload_tiff(map)
-    elsif action == 'add_store'
-      add_store(map)
-    elsif action == 'add_layer'
-      add_layer(map)
-    elsif action == 'update_layer'
-      update_layer(map)
+    elsif action == 'add_to_geoserver'
+      add_to_geoserver(map)
     else
       puts "Unkonw method."
       exit
@@ -314,7 +351,7 @@ if maps == nil
   run_what(map)
 else
   if @options.metadata_file_path != nil
-    puts "You can not specify a metadata file when processing multiple files."
+    puts "You cannot specify a metadata file when processing multiple files."
     exit
   end
   maps.each do |map|
