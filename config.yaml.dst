@@ -1,0 +1,18 @@
+sftp_user: 'sftp user for uploading GeoTiffs to GeoServer'
+sftp_pass: 'sftp password for uploading GeoTiffs to GeoServer'
+sftp_host: 'sftp host for uploading GeoTiffs to GeoServer'
+sftp_path: '/sftp/path'
+in_dir: '/path/to/goetiffs/*.tif'
+tmp_dir: '/some/tmp/dir'
+out_dir: '/some/dir/for/processed/geotiffs'
+geoserver_url: 'https://myegeoserver.com'
+geoserver_user: 'user'
+geoserver_pass: 'password'
+geoserver_workspace: 'someWorkspace'
+geoserver_file_path: 'some/dir'
+pidman_user: 'user'
+pidman_pass: 'password'
+pidman_url: 'https://testpid.library.emory.edu'
+pidman_domain: 'https://testpid.library.emory.edu/domains/XX/'
+input_coordinate_system: 'EPSG:2240' # must be EPSG
+output_coordinate_system: 'EPSG:4326' # must be EPSG
