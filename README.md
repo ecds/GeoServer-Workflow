@@ -39,6 +39,7 @@ You can also run a single part of the script:
 		-t, --tif /path/to/map.tif         Path to tif file.
     	-d, --mdfile /path/to/metadata.xml Path to metadata file.
       	-m, --method METHOD                Run a single method.
+		-y, --default_cs                   Use the coordinate systems form config file.
        Methods:
        	process # Runs the GeoTIFF thorugh GDAL process
        	upload # Uploads GeoTIFF to GeoServer

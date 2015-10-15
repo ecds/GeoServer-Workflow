@@ -6,6 +6,7 @@ require 'nokogiri'
 require 'optparse'
 require 'ostruct'
 require 'logger'
+require 'highline/import'
 
 $logger = Logger.new('map_processing.log')
 $config = YAML.load_file('config.yaml')
@@ -59,6 +60,22 @@ class Map
     rescue
       $logger.error "Fool, no metadata for #{self.tif_file}"
       return nil
+    end
+  end
+
+  def input_cs()
+    if $options.use_default_cs
+      $config['input_coordinate_system']
+    else
+      ask("Input Coordinate System?  ") { |q| q.default = $config['input_coordinate_system'] }
+    end
+  end
+
+  def output_cs()
+    if $options.use_default_cs
+      $config['output_coordinate_system']
+    else
+      ask("Output Coordinate System?  ") { |q| q.default = $config['output_coordinate_system'] }
     end
   end
 
@@ -277,7 +294,7 @@ def process_files(map)
   tmp_dir = $config['tmp_dir']
   out_dir = $config['out_dir']
 
-  warp = "gdalwarp -s_srs EPSG:2240 -t_srs EPSG:4326 -r average\
+  warp = "gdalwarp -s_srs #{map.input_cs} -t_srs #{map.output_cs} -r average\
     #{map.full_path} #{tmp_dir}#{map.tif_file}"
   system warp
   check_exit_status($?.exitstatus, warp)
@@ -306,22 +323,25 @@ def run_all(map)
   end
 end
 
-@options = OpenStruct.new
+$options = OpenStruct.new
 OptionParser.new do |opt|
   opt.on('--tif', '-t /path/to/map.tif', ' Path to tif file.') {
-    |o| @options.tif_file_path = o
+    |o| $options.tif_file_path = o
   }
   opt.on('--mdfile', '-d /path/to/metadata.xml', 'Path to metadata file.') {
-    |o| @options.metadata_file_path = o
+    |o| $options.metadata_file_path = o
   }
   opt.on('--method', '-m METHOD', 'Run a single method.') {
-    |o| @options.method_to_run = o
+    |o| $options.method_to_run = o
+  }
+  opt.on('--default_cs', '-y', 'Use the coordinate systems form config file.') {
+    |o| $options.use_default_cs = o
   }
 end.parse!
 
 def run_what(map)
-  if @options.method_to_run != nil
-    action = @options.method_to_run
+  if $options.method_to_run != nil
+    action = $options.method_to_run
     if action == 'process'
       process_files(map)
     elsif action == 'upload'
@@ -337,8 +357,8 @@ def run_what(map)
   end
 end
 
-if @options.tif_file_path
-  map = Map.new(@options.tif_file_path, @options.metadata_file_path)
+if $options.tif_file_path
+  map = Map.new($options.tif_file_path, $options.metadata_file_path)
 else
   maps = []
   Dir[$config['in_dir']].each do |file|
@@ -350,7 +370,7 @@ end
 if maps == nil
   run_what(map)
 else
-  if @options.metadata_file_path != nil
+  if $options.metadata_file_path != nil
     puts "You cannot specify a metadata file when processing multiple files."
     exit
   end
