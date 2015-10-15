@@ -14,5 +14,5 @@ pidman_user: 'user'
 pidman_pass: 'password'
 pidman_url: 'https://testpid.library.emory.edu'
 pidman_domain: 'https://testpid.library.emory.edu/domains/XX/'
-input_ coordinate_system: 'EPSG:2240' # must be EPSG
-output_ coordinate_system: 'EPSG:4326' # must be EPSG
+input_coordinate_system: 'EPSG:2240' # must be EPSG
+output_coordinate_system: 'EPSG:4326' # must be EPSG

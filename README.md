@@ -16,6 +16,8 @@ You will need ruby and a few gems:
 
 <code>gem install nokogiri</code>
 
+<code>gem install highline</code>
+
 ## config.yaml
 Provided is a sample config file (<code>config.yaml.dst</code>). Rename that to <code>config.yaml</code> and fill in the various items.
 
