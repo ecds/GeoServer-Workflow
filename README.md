@@ -41,9 +41,11 @@ In QGIS, the EPSG code can usually be found in the Layer Properties box (highlig
 ![](https://s3.amazonaws.com/atlmaps-prod/properties2.png)If you are having difficulty determining an EPSG code, the makers of Geoserver have also created a handy tool to help: http://prj2epsg.org/search
 
 ## Usage
-If you do not pass any options to the script, it will run though the process described above. You can pass it a specific path to a GeoTIFF. You can also pass it a specific path for a metadata file. If you do not provide a metadata file, the script will try to find it based on the file's name. Note: You can only specify a metadata file when specifying a GeoTIFF.
+If you do not pass any options to the script, it will run though the process described above. You will be prompted for input and output coordinate systemes (EPSG codes). It will default to the ones you set in the `config.yaml`. To use the configured codes, simply tap enter when prompted. Otherwise, you can override your configured code. See section above about EPSG codes. You can also run the sript with the `-y` flag to accept the defaults without being prompted (good for automating or running a large batch at once).
 
-You can also run a single part of the script:
+You can pass the a specific path to a GeoTIFF with the `-t` flag. You can also pass it a specific path for a metadata file with the `-m` flag. If you do not provide a metadata file, the script will try to find it based on the file's name. **Note**: You can only specify a metadata file when specifying a GeoTIFF.
+
+You can also run a single part of the script with the `-m [name of metod]`. Below are all the optins and names of each method:
 
 	ruby tada [options]
 		-t, --tif /path/to/map.tif         Path to tif file.
