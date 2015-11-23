@@ -84,7 +84,7 @@ class Map
       # Try to figure out if there is already an ARK in the metadata file.
       # If not, make one and add it to the metadata file.
       @data = Nokogiri::XML(File.open(self.metadata_file))
-      ark_field =  @data.xpath("//field[@name='ark']//value").first
+      ark_field =  @data.xpath("//field[@name='id_local']//value").first
       # Check to see if the ARK filed exists or is empty.
       if ark_field.nil? || ark_field.text == ''
 
@@ -93,7 +93,7 @@ class Map
         # If there is no placeholder field, make the filed.
         if ark_field.nil?
           record = @data.xpath('//record//field')[-1]
-          record.add_next_sibling("<field name='ark'><value>#{ark}</value></field>")
+          record.add_next_sibling("<field name='id_local'><value>#{ark}</value></field>")
         # If there is one, populate it.
         else
           ark_field.content = ark
