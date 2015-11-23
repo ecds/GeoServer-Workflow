@@ -188,7 +188,7 @@ class GeoServer
           xml.metadataLink {
             xml.type 'text/plain'
             xml.metadataType 'ISO19115:2003'
-            xml.content "http://digitalscholarship.emory.edu/mslemons/1928AtlantaAtlas/#{map.file_name}.xml"
+            xml.content "https://geospatial.library.emory.edu/metadata/#{map.file_name}.xml"
           }
         }
       }
@@ -371,6 +371,7 @@ if maps == nil
   run_what(map)
 else
   if $options.metadata_file_path != nil
+    # TODO: why did I decide to limit it like this?
     puts "You cannot specify a metadata file when processing multiple files."
     exit
   end
