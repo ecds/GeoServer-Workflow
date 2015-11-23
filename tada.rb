@@ -119,7 +119,7 @@ class Map
     }
 
     response = HTTParty.post \
-      '#{$config['pidman_url']}/ark/', \
+      "#{$config['pidman_domain']}/ark/", \
       body: "domain=#{$config['pidman_domain']}&target_uri=myuri.org&name=#{self.metadata['title']}", \
       basic_auth: pidman_auth
     # The response will give us the full URL, we just want the PID.
